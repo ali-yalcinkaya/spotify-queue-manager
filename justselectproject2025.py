@@ -4,18 +4,24 @@ import uuid
 import time
 import json
 import os
+from dotenv import load_dotenv
+
+# .env yükleme
+load_dotenv()
 
 app = Flask(__name__)
 app.secret_key = str(uuid.uuid4())
 
-CLIENT_ID = "f338bc70b18c49ce9ea3bd3b77465f45"
-CLIENT_SECRET = "afd7ef9e569643ad851e258332a50a2b"
-REDIRECT_URI = "https://spotify-queue-manager.onrender.com/callback"
+CLIENT_ID = os.getenv("CLIENT_ID")
+CLIENT_SECRET = os.getenv("CLIENT_SECRET")
+REDIRECT_URI = os.getenv("REDIRECT_URI")
+ADD_LIMIT_SECONDS = int(os.getenv("ADD_LIMIT_SECONDS", 60))
+TOKENS_FILE = os.getenv("TOKENS_FILE", "tokens.json")
+
 TOKEN_INFO = "token_info"
 
 TOKENS_FILE = "tokens.json"
 user_last_add_time = {}
-ADD_LIMIT_SECONDS = 60  # 10 dakika
 
 # ------------------ Token Dosya Fonksiyonları ------------------
 def save_tokens(token_info):
