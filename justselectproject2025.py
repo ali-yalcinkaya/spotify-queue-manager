@@ -4,22 +4,15 @@ import uuid
 import time
 import json
 import os
-from dotenv import load_dotenv
-
-# .env dosyasını yükle (yerelde çalışırken)
-load_dotenv()
 
 app = Flask(__name__)
+app.secret_key = str(uuid.uuid4())
 
-# Flask secret key ortamdan al, yoksa rastgele üret
-app.secret_key = os.getenv("FLASK_SECRET_KEY", str(uuid.uuid4()))
-
-# Spotify API bilgilerini ortamdan al
-CLIENT_ID = os.getenv("SPOTIFY_CLIENT_ID")
-CLIENT_SECRET = os.getenv("SPOTIFY_CLIENT_SECRET")
-REDIRECT_URI = os.getenv("SPOTIFY_REDIRECT_URI")
-
+CLIENT_ID = "f338bc70b18c49ce9ea3bd3b77465f45"
+CLIENT_SECRET = "afd7ef9e569643ad851e258332a50a2b"
+REDIRECT_URI = "https://spotify-queue-manager.onrender.com/callback"
 TOKEN_INFO = "token_info"
+
 TOKENS_FILE = "tokens.json"
 user_last_add_time = {}
 ADD_LIMIT_SECONDS = 60  # 10 dakika
