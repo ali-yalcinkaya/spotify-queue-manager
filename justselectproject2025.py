@@ -6,7 +6,7 @@ import json
 import os
 from dotenv import load_dotenv
 
-# .env yükleme
+# .env yükleme (*render içinde envler olarak belirtildi ekstra .env yok)
 load_dotenv()
 
 app = Flask(__name__)
