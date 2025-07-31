@@ -2,6 +2,8 @@ from flask import Flask, redirect, request, session, url_for, render_template_st
 import requests
 import uuid
 import time
+import json
+import os
 
 app = Flask(__name__)
 app.secret_key = str(uuid.uuid4())
@@ -11,12 +13,230 @@ CLIENT_SECRET = "afd7ef9e569643ad851e258332a50a2b"
 REDIRECT_URI = "https://spotify-queue-manager.onrender.com/callback"
 TOKEN_INFO = "token_info"
 
+TOKENS_FILE = "tokens.json"
 user_last_add_time = {}
-ADD_LIMIT_SECONDS = 600  # 10 dakika
+ADD_LIMIT_SECONDS = 60  # 10 dakika
+
+# ------------------ Token Dosya Fonksiyonları ------------------
+def save_tokens(token_info):
+    with open(TOKENS_FILE, "w") as f:
+        json.dump(token_info, f)
+
+def load_tokens():
+    if os.path.exists(TOKENS_FILE):
+        with open(TOKENS_FILE, "r") as f:
+            return json.load(f)
+    return None
 
 # ------------------ HTML Templates ------------------
-HTML_TEMPLATE = """ ... senin HTML_TEMPLATE kodun buraya gelecek ... """
-QUEUE_TEMPLATE = """ ... senin QUEUE_TEMPLATE kodun buraya gelecek ... """
+HTML_TEMPLATE = """
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Spotify Queue Manager</title>
+    <style>
+        body { 
+            font-family: 'Segoe UI', Arial, sans-serif; 
+            margin: 0; 
+            background-color: #121212; 
+            color: #fff; 
+        }
+        header {
+            background-color: #1DB954;
+            padding: 15px;
+            text-align: center;
+            font-size: 1.5em;
+            font-weight: bold;
+            color: #fff;
+        }
+        main {
+            padding: 20px;
+            max-width: 800px;
+            margin: auto;
+        }
+        form {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+        input {
+            padding: 12px;
+            flex: 1 1 250px;
+            border: none;
+            border-radius: 25px;
+            outline: none;
+        }
+        button, a.btn {
+            padding: 12px 20px;
+            border: none;
+            border-radius: 25px;
+            background-color: #1DB954;
+            color: white;
+            font-weight: bold;
+            cursor: pointer;
+            text-decoration: none;
+            transition: background 0.2s;
+        }
+        button:hover, a.btn:hover {
+            background-color: #17a94b;
+        }
+        .track-grid {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            gap: 15px;
+            margin-top: 20px;
+        }
+        .track {
+            background-color: #181818;
+            padding: 10px;
+            border-radius: 10px;
+            width: 160px;
+            text-align: center;
+            transition: transform 0.2s;
+        }
+        .track:hover {
+            transform: scale(1.05);
+        }
+        img {
+            width: 100%;
+            border-radius: 5px;
+        }
+        #popup {
+            display: none;
+            position: fixed;
+            top: 20px; 
+            left: 50%; 
+            transform: translateX(-50%);
+            background-color: #1DB954;
+            color: white;
+            padding: 15px 25px; 
+            border-radius: 8px;
+            font-weight: bold; 
+            z-index: 9999;
+        }
+        #countdown {
+            font-size: 18px; 
+            color: #ff4c4c; 
+            margin-top: 10px; 
+            text-align: center;
+        }
+        @media (max-width: 500px) {
+            .track { width: 45%; }
+        }
+    </style>
+</head>
+<body>
+    <header>🎵 Spotify Queue Manager</header>
+    <main>
+        <div id="popup">✅ Şarkı eklendi!</div>
+        <form action="/search">
+            <input type="text" name="query" placeholder="Şarkı veya sanatçı ara" required>
+            <button type="submit">Ara</button>
+        </form>
+        <p style="text-align:center;margin-top:10px;">
+            <a class="btn" href="/queue">📜 İstek Listesini Gör</a>
+        </p>
+        {% if wait_time > 0 %}
+            <div id="countdown"></div>
+            <script>
+                let remaining = {{ wait_time }};
+                function updateCountdown() {
+                    let minutes = Math.floor(remaining / 60);
+                    let seconds = remaining % 60;
+                    document.getElementById("countdown").innerHTML =
+                        "⏳ Tekrar eklemek için: " + minutes + " dk " + seconds + " sn";
+                    if (remaining > 0) {
+                        remaining--;
+                        setTimeout(updateCountdown, 1000);
+                    } else {
+                        location.reload();
+                    }
+                }
+                updateCountdown();
+            </script>
+        {% endif %}
+        <div class="track-grid">
+            {% if tracks %}
+                {% for t in tracks %}
+                    <div class="track">
+                        <img src="{{ t['image'] }}" alt="cover">
+                        <p><b>{{ t['name'] }}</b><br><small>{{ t['artist'] }}</small></p>
+                        {% if wait_time > 0 %}
+                            <button disabled>Sıraya Ekle</button>
+                        {% else %}
+                            <a class="btn" href="/add_to_queue?uri={{ t['uri'] }}">Sıraya Ekle</a>
+                        {% endif %}
+                    </div>
+                {% endfor %}
+            {% endif %}
+        </div>
+    </main>
+    <script>
+        {% if added %}
+            document.getElementById('popup').style.display = 'block';
+            setTimeout(() => { document.getElementById('popup').style.display = 'none'; }, 2000);
+        {% endif %}
+    </script>
+</body>
+</html>
+"""
+
+QUEUE_TEMPLATE = """
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Spotify Queue</title>
+    <style>
+        body { font-family: 'Segoe UI', Arial, sans-serif; margin:0; background:#121212; color:white; }
+        header { background:#1DB954; padding:15px; text-align:center; font-size:1.5em; font-weight:bold; }
+        main { padding:20px; max-width:800px; margin:auto; }
+        .btn { background:#1DB954; padding:10px 20px; border-radius:25px; color:white; text-decoration:none; font-weight:bold; }
+        .track-grid { display:flex; flex-wrap:wrap; gap:15px; justify-content:center; }
+        .track { background:#181818; padding:10px; border-radius:10px; width:160px; text-align:center; }
+        img { width:100%; border-radius:5px; }
+        @media (max-width:500px) {
+            .track { width:45%; }
+        }
+    </style>
+</head>
+<body>
+    <header>📜 İstek Listesi</header>
+    <main>
+        <p style="text-align:center;"><a class="btn" href="/">⬅ Ana Sayfa</a></p>
+        <h2>🎶 Şu An Çalan</h2>
+        {% if current %}
+            <div class="track-grid">
+                <div class="track">
+                    <img src="{{ current['image'] }}" alt="cover">
+                    <p><b>{{ current['name'] }}</b><br><small>{{ current['artist'] }}</small></p>
+                </div>
+            </div>
+        {% else %}
+            <p>Şu an çalan şarkı bulunamadı.</p>
+        {% endif %}
+        <h2>⏭ Sıradaki Şarkılar</h2>
+        {% if queue %}
+            <div class="track-grid">
+                {% for t in queue %}
+                    <div class="track">
+                        <img src="{{ t['image'] }}" alt="cover">
+                        <p><b>{{ t['name'] }}</b><br><small>{{ t['artist'] }}</small></p>
+                    </div>
+                {% endfor %}
+            </div>
+        {% else %}
+            <p>İstek listesi boş.</p>
+        {% endif %}
+    </main>
+</body>
+</html>
+"""
 
 # ------------------ Yardımcı Fonksiyonlar ------------------
 @app.before_request
@@ -35,13 +255,13 @@ def get_wait_time(user_id):
     return max(0, ADD_LIMIT_SECONDS - int(now - last_time))
 
 def refresh_access_token():
-    """Spotify refresh_token ile access_token yenile"""
-    token_info = session.get(TOKEN_INFO)
+    token_info = session.get(TOKEN_INFO) or load_tokens()
     if not token_info or "refresh_token" not in token_info:
         return None
 
+    # Token hâlâ geçerliyse
     if time.time() < token_info.get("expires_at", 0):
-        return token_info["access_token"]  # hâlâ geçerli
+        return token_info["access_token"]
 
     print("🔄 Access token yenileniyor...")
     res = requests.post(
@@ -61,13 +281,15 @@ def refresh_access_token():
     new_tokens = res.json()
     token_info["access_token"] = new_tokens["access_token"]
     token_info["expires_at"] = time.time() + new_tokens.get("expires_in", 3600)
+
+    save_tokens(token_info)
     session[TOKEN_INFO] = token_info
     return token_info["access_token"]
 
 # ------------------ ROUTES ------------------
 @app.route("/")
 def index():
-    token_info = session.get(TOKEN_INFO)
+    token_info = session.get(TOKEN_INFO) or load_tokens()
     if not token_info:
         return redirect(url_for("login"))
 
@@ -106,6 +328,15 @@ def callback():
     )
     token_data = res.json()
     token_data["expires_at"] = time.time() + token_data.get("expires_in", 3600)
+
+    # Önceki token varsa yükle
+    existing = load_tokens() or {}
+
+    # refresh_token dönmediyse eskisini koru
+    if "refresh_token" not in token_data and "refresh_token" in existing:
+        token_data["refresh_token"] = existing["refresh_token"]
+
+    save_tokens(token_data)
     session[TOKEN_INFO] = token_data
     return redirect(url_for("index"))
 
