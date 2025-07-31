@@ -8,7 +8,7 @@ app.secret_key = str(uuid.uuid4())
 
 CLIENT_ID = "f338bc70b18c49ce9ea3bd3b77465f45"
 CLIENT_SECRET = "afd7ef9e569643ad851e258332a50a2b"
-REDIRECT_URI = "http://localhost:5000/callback"
+REDIRECT_URI = "https://spotify-queue-manager.onrender.com/callback"
 TOKEN_INFO = "token_info"
 
 user_last_add_time = {}
