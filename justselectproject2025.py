@@ -12,6 +12,9 @@ CLIENT_ID = os.getenv("CLIENT_ID")
 CLIENT_SECRET = os.getenv("CLIENT_SECRET")
 REDIRECT_URI = os.getenv("REDIRECT_URI")
 
+print("ENV DEBUG:", CLIENT_ID, CLIENT_SECRET, REDIRECT_URI)
+
+
 TOKEN_INFO = "token_info"
 
 TOKENS_FILE = "tokens.json"
