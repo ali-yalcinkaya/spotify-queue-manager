@@ -8,9 +8,10 @@ import os
 app = Flask(__name__)
 app.secret_key = str(uuid.uuid4())
 
-CLIENT_ID = "f338bc70b18c49ce9ea3bd3b77465f45"
-CLIENT_SECRET = "afd7ef9e569643ad851e258332a50a2b"
-REDIRECT_URI = "https://spotify-queue-manager.onrender.com/callback"
+CLIENT_ID = os.getenv("CLIENT_ID")
+CLIENT_SECRET = os.getenv("CLIENT_SECRET")
+REDIRECT_URI = os.getenv("REDIRECT_URI")
+
 TOKEN_INFO = "token_info"
 
 TOKENS_FILE = "tokens.json"
